@@ -1732,7 +1732,7 @@ let is_eq_x gl x d =
 (* Rewrite "hyp:x=rhs" or "hyp:rhs=x" (if dir=false) everywhere and
    erase hyp and x; proceed by generalizing all dep hyps *)
 
-let subst_one fast dep_proof_ok x (hyp,rhs,dir) =
+let subst_one (fast: bool) dep_proof_ok x (hyp,rhs,dir) =
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Tacmach.New.project gl in
@@ -1783,11 +1783,11 @@ let subst_one_var fast dep_proof_ok x =
             (str "Cannot find any non-recursive equality over " ++ Id.print x ++
 	       str".")
         with FoundHyp res -> res in
-      subst_one dep_proof_ok fast x res
+      subst_one fast dep_proof_ok x res
   end
 
 let subst_gen fast dep_proof_ok ids =
-  tclMAP (subst_one_var dep_proof_ok fast) ids
+  tclMAP (subst_one_var fast dep_proof_ok) ids
 
 (* For every x, look for an hypothesis hyp of the form "x=rhs" or "rhs=x",
    rewrite it everywhere, and erase hyp and x; proceed by generalizing
@@ -1852,9 +1852,9 @@ let subst_all ?(flags=default_subst_tactic_flags) () =
     if EConstr.eq_constr sigma x y then Proofview.tclUNIT () else
       match EConstr.kind sigma x, EConstr.kind sigma y with
       | Var x', _ when not (Termops.local_occur_var sigma x' y) && not (is_evaluable env (EvalVarRef x')) ->
-          subst_one flags.rewrite_dependent_proof false x' (hyp,y,true)
+          subst_one false flags.rewrite_dependent_proof x' (hyp,y,true)
       | _, Var y' when not (Termops.local_occur_var sigma y' x) && not (is_evaluable env (EvalVarRef y')) ->
-          subst_one flags.rewrite_dependent_proof false y' (hyp,x,false)
+          subst_one false flags.rewrite_dependent_proof y' (hyp,x,false)
       | _ ->
           Proofview.tclUNIT ()
     end
