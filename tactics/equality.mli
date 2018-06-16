@@ -127,7 +127,7 @@ type subst_tactic_flags = {
   rewrite_dependent_proof : bool
 }
 val subst_gen : bool -> bool -> Id.t list -> unit Proofview.tactic
-val subst : bool -> Id.t list -> unit Proofview.tactic
+val subst : Id.t list -> unit Proofview.tactic
 val subst_all : ?flags:subst_tactic_flags -> unit -> unit Proofview.tactic
 
 (* Replace term *)

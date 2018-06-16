@@ -417,7 +417,7 @@ END
 (* Subst                                                              *)
 
 TACTIC EXTEND subst
-| [ "subst" ne_var_list(l) ] -> [ subst false l ]
+| [ "subst" ne_var_list(l) ] -> [ subst l ]
 | [ "subst" ] -> [ subst_all () ]
 END
 

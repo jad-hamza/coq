@@ -1793,7 +1793,7 @@ let subst_gen fast dep_proof_ok ids =
    rewrite it everywhere, and erase hyp and x; proceed by generalizing
    all dep hyps *)
 
-let subst = subst_gen true
+let subst = subst_gen false true
 
 type subst_tactic_flags = {
   only_leibniz : bool;
@@ -1887,7 +1887,7 @@ let subst_all ?(flags=default_subst_tactic_flags) () =
   let hyps = pf_hyps_types gl in
   let ids = List.map_filter test hyps in
   let ids = List.uniquize ids in
-  subst_gen flags.rewrite_dependent_proof false ids
+  subst_gen false flags.rewrite_dependent_proof ids
   end
 
 (* Rewrite the first assumption for which a condition holds
