@@ -504,7 +504,7 @@ let evaluable_of_global_reference r = (* Tacred.evaluable_of_global_reference (G
 let list_rewrite (rev:bool) (eqs: (EConstr.constr*bool) list) =
   tclREPEAT
     (List.fold_right
-       (fun (eq,b) i -> tclORELSE (Proofview.V82.of_tactic ((if b then Equality.rewriteLR else Equality.rewriteRL) eq)) i)
+       (fun (eq,b) i -> tclORELSE (Proofview.V82.of_tactic ((if b then Equality.rewriteLR false else Equality.rewriteRL false ) eq)) i)
        (if rev then (List.rev eqs) else eqs) (tclFAIL 0 (mt())));;
 
 let decompose_lam_n sigma n =

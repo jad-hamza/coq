@@ -203,6 +203,39 @@ let rewrite_conv_closed_unif_flags = {
   resolve_evars = false
 }
 
+let fast_rewrite_conv_closed_core_unif_flags = {
+  modulo_conv_on_closed_terms = None;
+
+  use_metas_eagerly_in_conv_on_closed_terms = false;
+  use_evars_eagerly_in_conv_on_closed_terms = false;
+    (* Combined with modulo_conv_on_closed_terms, this flag allows since 8.2 *)
+    (* to rewrite e.g. "?x+(2+?x)" in "1+(1+2)=0" *)
+
+  modulo_delta = empty_transparent_state;
+  modulo_delta_types = empty_transparent_state;
+  check_applied_meta_types = false;
+  use_pattern_unification = false;
+    (* To rewrite "?n x y" in "y+x=0" when ?n is *)
+    (* a preexisting evar of the goal*)
+
+  use_meta_bound_pattern_unification = false;
+
+  frozen_evars = Evar.Set.empty;
+    (* This is set dynamically *)
+
+  restrict_conv_on_strict_subterms = false;
+  modulo_betaiota = false;
+  modulo_eta = false;
+}
+
+let fast_rewrite_conv_closed_unif_flags = {
+  core_unify_flags = fast_rewrite_conv_closed_core_unif_flags;
+  merge_unify_flags = fast_rewrite_conv_closed_core_unif_flags;
+  subterm_unify_flags = fast_rewrite_conv_closed_core_unif_flags;
+  allow_K_in_toplevel_higher_order_unification = false;
+  resolve_evars = false
+}
+
 let rewrite_keyed_core_unif_flags = {
   modulo_conv_on_closed_terms = Some full_transparent_state;
     (* We have this flag for historical reasons, it has e.g. the consequence *)
@@ -239,10 +272,14 @@ let rewrite_keyed_unif_flags = {
   resolve_evars = false
 }
 
-let rewrite_elim with_evars frzevars cls c e =
+let rewrite_elim (fast: bool) with_evars frzevars cls c e =
   Proofview.Goal.enter begin fun gl ->
-  let flags = if Unification.is_keyed_unification ()
-	      then rewrite_keyed_unif_flags else rewrite_conv_closed_unif_flags in
+  let flags = 
+    if Unification.is_keyed_unification ()
+	  then rewrite_keyed_unif_flags 
+    else if fast
+    then fast_rewrite_conv_closed_unif_flags
+    else rewrite_conv_closed_unif_flags in
   let flags = make_flags frzevars (Tacmach.New.project gl) flags c in
   general_elim_clause with_evars flags cls c e
   end
@@ -267,7 +304,7 @@ let tclNOTSAMEGOAL tac =
   end
 
 (* Ad hoc asymmetric general_elim_clause *)
-let general_elim_clause with_evars frzevars cls rew elim =
+let general_elim_clause fast with_evars frzevars cls rew elim =
   let open Pretype_errors in
   Proofview.tclORELSE
     begin match cls with
@@ -275,8 +312,8 @@ let general_elim_clause with_evars frzevars cls rew elim =
       (* was tclWEAK_PROGRESS which only fails for tactics generating one
           subgoal and did not fail for useless conditional rewritings generating
           an extra condition *)
-      tclNOTSAMEGOAL (rewrite_elim with_evars frzevars cls rew elim)
-    | Some _ -> rewrite_elim with_evars frzevars cls rew elim
+      tclNOTSAMEGOAL (rewrite_elim fast with_evars frzevars cls rew elim)
+    | Some _ -> rewrite_elim fast with_evars frzevars cls rew elim
     end
     begin function (e, info) -> match e with
     | PretypeError (env, evd, NoOccurrenceFound (c', _)) ->
@@ -284,7 +321,7 @@ let general_elim_clause with_evars frzevars cls rew elim =
     | e -> Proofview.tclZERO ~info e
     end
 
-let general_elim_clause with_evars frzevars tac cls c t l l2r elim =
+let general_elim_clause (fast: bool) with_evars frzevars tac cls c t l l2r elim =
   let all, firstonly, tac =
     match tac with
     | None -> false, false, None
@@ -296,7 +333,7 @@ let general_elim_clause with_evars frzevars tac cls c t l l2r elim =
     side_tac
       (tclTHEN
          (Proofview.Unsafe.tclEVARS c.evd)
-         (general_elim_clause with_evars frzevars cls c elim))
+         (general_elim_clause fast with_evars frzevars cls c elim))
       tac
   in
   Proofview.Goal.enter begin fun gl ->
@@ -401,7 +438,7 @@ let type_of_clause cls gl = match cls with
   | None -> Proofview.Goal.concl gl
   | Some id -> pf_get_hyp_typ id gl
 
-let leibniz_rewrite_ebindings_clause cls lft2rgt tac c t l with_evars frzevars dep_proof_ok hdcncl =
+let leibniz_rewrite_ebindings_clause fast cls lft2rgt tac c t l with_evars frzevars dep_proof_ok hdcncl =
   Proofview.Goal.enter begin fun gl ->
   let evd = Proofview.Goal.sigma gl in
   let isatomic = isProd evd (whd_zeta evd hdcncl) in
@@ -409,7 +446,7 @@ let leibniz_rewrite_ebindings_clause cls lft2rgt tac c t l with_evars frzevars d
   let type_of_cls = type_of_clause cls gl in
   let dep = dep_proof_ok && dep_fun evd c type_of_cls in
   find_elim hdcncl lft2rgt dep cls (Some t) >>= fun elim ->
-      general_elim_clause with_evars frzevars tac cls c t l
+      general_elim_clause fast with_evars frzevars tac cls c t l
       (match lft2rgt with None -> false | Some b -> b)
       {elimindex = None; elimbody = (elim,NoBindings); elimrename = None}
   end
@@ -443,7 +480,7 @@ let general_rewrite_ebindings_clause fast cls lft2rgt occs frzevars dep_proof_ok
       match match_with_equality_type sigma t with
       | Some (hdcncl,args) -> (* Fast path: direct leibniz-like rewrite *)
 	  let lft2rgt = adjust_rewriting_direction args lft2rgt in
-          leibniz_rewrite_ebindings_clause cls lft2rgt tac c (it_mkProd_or_LetIn t rels)
+          leibniz_rewrite_ebindings_clause fast cls lft2rgt tac c (it_mkProd_or_LetIn t rels)
 	    l with_evars frzevars dep_proof_ok hdcncl
       | None ->
 	  Proofview.tclORELSE
@@ -459,7 +496,7 @@ let general_rewrite_ebindings_clause fast cls lft2rgt occs frzevars dep_proof_ok
 	          match match_with_equality_type sigma t' with
 	            | Some (hdcncl,args) ->
 		  let lft2rgt = adjust_rewriting_direction args lft2rgt in
-		  leibniz_rewrite_ebindings_clause cls lft2rgt tac c
+		  leibniz_rewrite_ebindings_clause fast cls lft2rgt tac c
 		    (it_mkProd_or_LetIn t' (rels' @ rels)) l with_evars frzevars dep_proof_ok hdcncl
 	            | None -> Proofview.tclZERO ~info e
             (* error "The provided term does not end with an equality or a declared rewrite relation." *)  
@@ -1720,7 +1757,7 @@ let subst_one fast dep_proof_ok x (hyp,rhs,dir) =
   tclTHENLIST
     ((if need_rewrite then
       [revert (List.map snd dephyps);
-       general_rewrite dir fast AllOccurrences true dep_proof_ok (mkVar hyp);
+       general_rewrite fast dir AllOccurrences true dep_proof_ok (mkVar hyp);
        (tclMAP (fun (dest,id) -> intro_move (Some id) dest) dephyps)]
       else
        [Proofview.tclUNIT ()]) @
