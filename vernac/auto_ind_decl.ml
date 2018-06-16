@@ -416,7 +416,7 @@ let do_replace_lb mode lb_scheme_key aavoid narg p q =
            in
            Tacticals.New.tclTHENLIST [
              Proofview.tclEFFECTS eff;
-             Equality.replace p q ; apply app ; Auto.default_auto]
+             Equality.replace false p q ; apply app ; Auto.default_auto]
   end
 
 (* used in the bool -> leib side *)
@@ -460,7 +460,7 @@ let do_replace_bl mode bl_scheme_key (ind,u as indu) aavoid narg lft rgt =
           (* trick so that the good sequence is returned*)
                 with e when CErrors.noncritical e -> indu,[||]
           in if eq_ind (fst u) ind
-             then Tacticals.New.tclTHENLIST [Equality.replace t1 t2; Auto.default_auto ; aux q1 q2 ]
+             then Tacticals.New.tclTHENLIST [Equality.replace false t1 t2; Auto.default_auto ; aux q1 q2 ]
              else (
                let bl_t1, eff =
                try 
@@ -488,7 +488,7 @@ let do_replace_bl mode bl_scheme_key (ind,u as indu) aavoid narg lft rgt =
                 in
                 Tacticals.New.tclTHENLIST [
                   Proofview.tclEFFECTS eff;
-                  Equality.replace_by t1 t2
+                  Equality.replace_by false t1 t2
                     (Tacticals.New.tclTHEN (apply app) (Auto.default_auto)) ;
                   aux q1 q2 ]
               )
@@ -950,7 +950,7 @@ let compute_dec_tact ind lnamesparrec nparrec =
                   apply (EConstr.of_constr (mkApp(lbI,Array.map mkVar xargs)));
                   Auto.default_auto
 		]);
-	      Equality.general_rewrite_bindings_in true
+	      Equality.general_rewrite_bindings_in false true
 	                      Locus.AllOccurrences true false
                               (List.hd !avoid)
                               ((EConstr.mkVar (List.hd (List.tl !avoid))),

@@ -134,7 +134,7 @@ let rec rewrite_and_clear hyps = match hyps with
 | [] -> Proofview.tclUNIT ()
 | id :: hyps ->
   tclTHENLIST [
-    Equality.rewriteLR (mkVar id);
+    Equality.rewriteLR false (mkVar id);
     clear [id];
     rewrite_and_clear hyps;
   ]

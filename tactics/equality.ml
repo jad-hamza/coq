@@ -430,7 +430,7 @@ let rewrite_side_tac tac sidetac = side_tac tac (Option.map fst sidetac)
 
 (* Main function for dispatching which kind of rewriting it is about *)
 
-let general_rewrite_ebindings_clause cls lft2rgt occs frzevars dep_proof_ok ?tac
+let general_rewrite_ebindings_clause fast cls lft2rgt occs frzevars dep_proof_ok ?tac
     ((c,l) : constr with_bindings) with_evars =
   if occs != AllOccurrences then (
     rewrite_side_tac (Hook.get forward_general_setoid_rewrite_clause cls lft2rgt occs (c,l) ~new_goals:[]) tac)
@@ -466,29 +466,29 @@ let general_rewrite_ebindings_clause cls lft2rgt occs frzevars dep_proof_ok ?tac
             end
     end
 
-let general_rewrite_ebindings =
-  general_rewrite_ebindings_clause None
+let general_rewrite_ebindings fast =
+  general_rewrite_ebindings_clause fast None
 
-let general_rewrite_bindings l2r occs frzevars dep_proof_ok ?tac (c,bl) =
-  general_rewrite_ebindings_clause None l2r occs
+let general_rewrite_bindings fast l2r occs frzevars dep_proof_ok ?tac (c,bl) =
+  general_rewrite_ebindings_clause fast None l2r occs
     frzevars dep_proof_ok ?tac (c,bl)
 
-let general_rewrite l2r occs frzevars dep_proof_ok ?tac c =
-  general_rewrite_bindings l2r occs
+let general_rewrite fast l2r occs frzevars dep_proof_ok ?tac c =
+  general_rewrite_bindings fast l2r occs
     frzevars dep_proof_ok ?tac (c,NoBindings) false
 
-let general_rewrite_ebindings_in l2r occs frzevars dep_proof_ok ?tac id =
-  general_rewrite_ebindings_clause (Some id) l2r occs frzevars dep_proof_ok ?tac
+let general_rewrite_ebindings_in fast l2r occs frzevars dep_proof_ok ?tac id =
+  general_rewrite_ebindings_clause fast (Some id) l2r occs frzevars dep_proof_ok ?tac
 
-let general_rewrite_bindings_in l2r occs frzevars dep_proof_ok ?tac id (c,bl) =
-  general_rewrite_ebindings_clause (Some id) l2r occs
+let general_rewrite_bindings_in fast l2r occs frzevars dep_proof_ok ?tac id (c,bl) =
+  general_rewrite_ebindings_clause fast (Some id) l2r occs
     frzevars dep_proof_ok ?tac (c,bl)
 
-let general_rewrite_in l2r occs frzevars dep_proof_ok ?tac id c =
-  general_rewrite_ebindings_clause (Some id) l2r occs
+let general_rewrite_in fast l2r occs frzevars dep_proof_ok ?tac id c =
+  general_rewrite_ebindings_clause fast (Some id) l2r occs
     frzevars dep_proof_ok ?tac (c,NoBindings)
 
-let general_rewrite_clause l2r with_evars ?tac c cl =
+let general_rewrite_clause fast l2r with_evars ?tac c cl =
   let occs_of = occurrences_map (List.fold_left
     (fun acc ->
       function ArgArg x -> x :: acc | ArgVar _ -> acc)
@@ -502,12 +502,12 @@ let general_rewrite_clause l2r with_evars ?tac c cl =
 	  | [] -> Proofview.tclUNIT ()
 	  | ((occs,id),_) :: l ->
 	    tclTHENFIRST
-	      (general_rewrite_ebindings_in l2r (occs_of occs) false true ?tac id c with_evars)
+	      (general_rewrite_ebindings_in fast l2r (occs_of occs) false true ?tac id c with_evars)
 	      (do_hyps l)
 	in
 	if cl.concl_occs == NoOccurrences then do_hyps l else
 	  tclTHENFIRST
-	    (general_rewrite_ebindings l2r (occs_of cl.concl_occs) false true ?tac c with_evars)
+	    (general_rewrite_ebindings fast l2r (occs_of cl.concl_occs) false true ?tac c with_evars)
             (do_hyps l)
     | None ->
 	(* Otherwise, if we are told to rewrite in all hypothesis via the
@@ -516,7 +516,7 @@ let general_rewrite_clause l2r with_evars ?tac c cl =
 	  | [] -> tclZEROMSG (Pp.str"Nothing to rewrite.")
 	  | id :: l ->
             tclIFTHENFIRSTTRYELSEMUST
-	     (general_rewrite_ebindings_in l2r AllOccurrences false true ?tac id c with_evars)
+	     (general_rewrite_ebindings_in fast l2r AllOccurrences false true ?tac id c with_evars)
 	     (do_hyps_atleastonce l)
 	in
 	let do_hyps =
@@ -532,7 +532,7 @@ let general_rewrite_clause l2r with_evars ?tac c cl =
 	in
 	if cl.concl_occs == NoOccurrences then do_hyps else
           tclIFTHENFIRSTTRYELSEMUST
-	   (general_rewrite_ebindings l2r (occs_of cl.concl_occs) false true ?tac c with_evars)
+	   (general_rewrite_ebindings fast l2r (occs_of cl.concl_occs) false true ?tac c with_evars)
 	   do_hyps
 
 let apply_special_clear_request clear_flag f =
@@ -552,14 +552,14 @@ type multi =
   | RepeatStar
   | RepeatPlus
 
-let general_multi_rewrite with_evars l cl tac =
+let general_multi_rewrite fast with_evars l cl tac =
   let do1 l2r f =
     Proofview.Goal.enter begin fun gl ->
       let sigma = Tacmach.New.project gl in
       let env = Proofview.Goal.env gl in
       let (sigma, c) = f env sigma in
       tclWITHHOLES with_evars
-        (general_rewrite_clause l2r with_evars ?tac c cl) sigma
+        (general_rewrite_clause fast l2r with_evars ?tac c cl) sigma
     end
   in
   let rec doN l2r c = function
@@ -578,8 +578,8 @@ let general_multi_rewrite with_evars l cl tac =
           (tclTHEN (doN l2r c m) (apply_special_clear_request clear_flag c)) (loop l)
   in loop l
 
-let rewriteLR = general_rewrite true AllOccurrences true true
-let rewriteRL = general_rewrite false AllOccurrences true true
+let rewriteLR fast = general_rewrite fast true AllOccurrences true true
+let rewriteRL fast = general_rewrite fast false AllOccurrences true true
 
 (* Replacing tactics *)
 
@@ -601,14 +601,14 @@ let check_setoid cl =
 	(Locusops.occurrences_map (fun x -> x) cl.concl_occs <> NoOccurrences))
     cl.onhyps
 
-let replace_core clause l2r eq =
+let replace_core fast clause l2r eq =
   if check_setoid clause
   then init_setoid ();
   tclTHENFIRST
     (assert_as false None None eq)
     (onLastHypId (fun id ->
       tclTHEN
-        (tclTRY (general_rewrite_clause l2r false (mkVar id,NoBindings) clause))
+        (tclTRY (general_rewrite_clause fast l2r false (mkVar id,NoBindings) clause))
 	(clear [id])))
 
 (* eq,sym_eq : equality on Type and its symmetry theorem
@@ -617,7 +617,7 @@ let replace_core clause l2r eq =
    tac : Used to prove the equality c1 = c2
    gl : goal *)
 
-let replace_using_leibniz clause c1 c2 l2r unsafe try_prove_eq_opt =
+let replace_using_leibniz (fast: bool) clause c1 c2 l2r unsafe try_prove_eq_opt =
   let try_prove_eq =
     match try_prove_eq_opt with
       | None -> Proofview.tclUNIT ()
@@ -643,7 +643,7 @@ let replace_using_leibniz clause c1 c2 l2r unsafe try_prove_eq_opt =
     Tacticals.New.pf_constr_of_global e >>= fun e ->
     let eq = applist (e, [t1;c1;c2]) in
     tclTHENLAST
-      (replace_core clause l2r eq)
+      (replace_core fast clause l2r eq)
       (tclFIRST
          [assumption;
           tclTHEN (apply sym) assumption;
@@ -651,14 +651,14 @@ let replace_using_leibniz clause c1 c2 l2r unsafe try_prove_eq_opt =
          ])
   end
 
-let replace c1 c2 =
-  replace_using_leibniz onConcl c2 c1 false false None
+let replace fast c1 c2 =
+  replace_using_leibniz fast onConcl c2 c1 false false None
 
-let replace_by c1 c2 tac =
-  replace_using_leibniz onConcl c2 c1 false false (Some tac)
+let replace_by fast c1 c2 tac =
+  replace_using_leibniz fast onConcl c2 c1 false false (Some tac)
 
-let replace_in_clause_maybe_by c1 c2 cl tac_opt =
-  replace_using_leibniz cl c2 c1 false false tac_opt
+let replace_in_clause_maybe_by (fast: bool) c1 c2 cl tac_opt =
+  replace_using_leibniz fast cl c2 c1 false false tac_opt
 
 (* End of Eduardo's code. The rest of this file could be improved
    using the functions match_with_equation, etc that I defined
@@ -1577,7 +1577,7 @@ let subst_tuple_term env sigma dep_pair1 dep_pair2 b =
 (* then it uses the predicate "\x.phi(proj1_sig x,proj2_sig x)", and so   *)
 (* on for further iterated sigma-tuples                                   *)
 
-let cutSubstInConcl l2r eqn =
+let cutSubstInConcl fast l2r eqn =
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Proofview.Goal.sigma gl in
@@ -1589,12 +1589,12 @@ let cutSubstInConcl l2r eqn =
   (tclTHENFIRST
     (tclTHENLIST [
        (change_concl typ); (* Put in pattern form *)
-       (replace_core onConcl l2r eqn)
+       (replace_core fast onConcl l2r eqn)
     ])
     (change_concl expected)) (* Put in normalized form *)
   end
 
-let cutSubstInHyp l2r eqn id =
+let cutSubstInHyp fast l2r eqn id =
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Proofview.Goal.sigma gl in
@@ -1606,7 +1606,7 @@ let cutSubstInHyp l2r eqn id =
     (tclTHENFIRST
     (tclTHENLIST [
        (change_in_hyp None (make_change_arg typ) (id,InHypTypeOnly));
-       (replace_core (onHyp id) l2r eqn)
+       (replace_core fast (onHyp id) l2r eqn)
     ])
     (change_in_hyp None (make_change_arg expected) (id,InHypTypeOnly)))
   end
@@ -1621,25 +1621,25 @@ let try_rewrite tac =
     | e -> Proofview.tclZERO ~info e
   end
 
-let cutSubstClause l2r eqn cls =
+let cutSubstClause fast l2r eqn cls =
   match cls with
-    | None ->    cutSubstInConcl l2r eqn
-    | Some id -> cutSubstInHyp l2r eqn id
+    | None ->    cutSubstInConcl fast l2r eqn
+    | Some id -> cutSubstInHyp fast l2r eqn id
 
-let cutRewriteClause l2r eqn cls = try_rewrite (cutSubstClause l2r eqn cls)
-let cutRewriteInHyp l2r eqn id = cutRewriteClause l2r eqn (Some id)
-let cutRewriteInConcl l2r eqn = cutRewriteClause l2r eqn None
+let cutRewriteClause fast l2r eqn cls = try_rewrite (cutSubstClause fast l2r eqn cls)
+let cutRewriteInHyp fast l2r eqn id = cutRewriteClause fast l2r eqn (Some id)
+let cutRewriteInConcl fast l2r eqn = cutRewriteClause fast l2r eqn None
 
-let substClause l2r c cls =
+let substClause fast l2r c cls =
   Proofview.Goal.enter begin fun gl ->
   let eq = pf_apply get_type_of gl c in
-  tclTHENS (cutSubstClause l2r eq cls)
+  tclTHENS (cutSubstClause fast l2r eq cls)
     [Proofview.tclUNIT (); exact_no_check c]
   end
 
-let rewriteClause l2r c cls = try_rewrite (substClause l2r c cls)
-let rewriteInHyp l2r c id = rewriteClause l2r c (Some id)
-let rewriteInConcl l2r c = rewriteClause l2r c None
+let rewriteClause fast l2r c cls = try_rewrite (substClause fast l2r c cls)
+let rewriteInHyp fast l2r c id = rewriteClause fast l2r c (Some id)
+let rewriteInConcl fast l2r c = rewriteClause fast l2r c None
 
 (* Naming scheme for rewrite and cutrewrite tactics
 
@@ -1695,7 +1695,7 @@ let is_eq_x gl x d =
 (* Rewrite "hyp:x=rhs" or "hyp:rhs=x" (if dir=false) everywhere and
    erase hyp and x; proceed by generalizing all dep hyps *)
 
-let subst_one dep_proof_ok x (hyp,rhs,dir) =
+let subst_one fast dep_proof_ok x (hyp,rhs,dir) =
   Proofview.Goal.enter begin fun gl ->
   let env = Proofview.Goal.env gl in
   let sigma = Tacmach.New.project gl in
@@ -1720,7 +1720,7 @@ let subst_one dep_proof_ok x (hyp,rhs,dir) =
   tclTHENLIST
     ((if need_rewrite then
       [revert (List.map snd dephyps);
-       general_rewrite dir AllOccurrences true dep_proof_ok (mkVar hyp);
+       general_rewrite dir fast AllOccurrences true dep_proof_ok (mkVar hyp);
        (tclMAP (fun (dest,id) -> intro_move (Some id) dest) dephyps)]
       else
        [Proofview.tclUNIT ()]) @
@@ -1730,7 +1730,7 @@ let subst_one dep_proof_ok x (hyp,rhs,dir) =
 (* Look for an hypothesis hyp of the form "x=rhs" or "rhs=x", rewrite
    it everywhere, and erase hyp and x; proceed by generalizing all dep hyps *)
 
-let subst_one_var dep_proof_ok x =
+let subst_one_var fast dep_proof_ok x =
   Proofview.Goal.enter begin fun gl ->
     let decl = pf_get_hyp x gl in
     (* If x has a body, simply replace x with body and clear x *)
@@ -1746,11 +1746,11 @@ let subst_one_var dep_proof_ok x =
             (str "Cannot find any non-recursive equality over " ++ Id.print x ++
 	       str".")
         with FoundHyp res -> res in
-      subst_one dep_proof_ok x res
+      subst_one dep_proof_ok fast x res
   end
 
-let subst_gen dep_proof_ok ids =
-  tclMAP (subst_one_var dep_proof_ok) ids
+let subst_gen fast dep_proof_ok ids =
+  tclMAP (subst_one_var dep_proof_ok fast) ids
 
 (* For every x, look for an hypothesis hyp of the form "x=rhs" or "rhs=x",
    rewrite it everywhere, and erase hyp and x; proceed by generalizing
@@ -1815,9 +1815,9 @@ let subst_all ?(flags=default_subst_tactic_flags) () =
     if EConstr.eq_constr sigma x y then Proofview.tclUNIT () else
       match EConstr.kind sigma x, EConstr.kind sigma y with
       | Var x', _ when not (Termops.local_occur_var sigma x' y) && not (is_evaluable env (EvalVarRef x')) ->
-          subst_one flags.rewrite_dependent_proof x' (hyp,y,true)
+          subst_one flags.rewrite_dependent_proof false x' (hyp,y,true)
       | _, Var y' when not (Termops.local_occur_var sigma y' x) && not (is_evaluable env (EvalVarRef y')) ->
-          subst_one flags.rewrite_dependent_proof y' (hyp,x,false)
+          subst_one flags.rewrite_dependent_proof false y' (hyp,x,false)
       | _ ->
           Proofview.tclUNIT ()
     end
@@ -1850,7 +1850,7 @@ let subst_all ?(flags=default_subst_tactic_flags) () =
   let hyps = pf_hyps_types gl in
   let ids = List.map_filter test hyps in
   let ids = List.uniquize ids in
-  subst_gen flags.rewrite_dependent_proof ids
+  subst_gen flags.rewrite_dependent_proof false ids
   end
 
 (* Rewrite the first assumption for which a condition holds
@@ -1876,7 +1876,7 @@ let cond_eq_term c t gl =
     else failwith "not convertible"
   with Constr_matching.PatternMatchingFailure -> failwith "not an equality"
 
-let rewrite_assumption_cond cond_eq_term cl =
+let rewrite_assumption_cond fast cond_eq_term cl =
   let rec arec hyps gl = match hyps with
     | [] -> user_err Pp.(str "No such assumption.")
     | hyp ::rest ->
@@ -1884,7 +1884,7 @@ let rewrite_assumption_cond cond_eq_term cl =
 	begin
 	  try
             let dir = cond_eq_term (NamedDecl.get_type hyp) gl in
-	    general_rewrite_clause dir false (mkVar id,NoBindings) cl
+	    general_rewrite_clause fast dir false (mkVar id,NoBindings) cl
 	  with | Failure _ | UserError _ -> arec rest gl
 	end
   in
@@ -1896,19 +1896,19 @@ let rewrite_assumption_cond cond_eq_term cl =
 (* Generalize "subst x" to substitution of subterm appearing as an
    equation in the context, but not clearing the hypothesis *)
 
-let replace_term dir_opt c  =
+let replace_term fast dir_opt c  =
   let cond_eq_fun =
     match dir_opt with
       | None -> cond_eq_term c
       | Some true -> cond_eq_term_left c
       | Some false -> cond_eq_term_right c
   in
-  rewrite_assumption_cond cond_eq_fun
+  rewrite_assumption_cond fast cond_eq_fun
 
 (* Declare rewriting tactic for intro patterns "<-" and "->" *)
 
 let _ =
-  let gmr l2r with_evars tac c = general_rewrite_clause l2r with_evars tac c in
+  let gmr l2r with_evars tac c = general_rewrite_clause false l2r with_evars tac c in
   Hook.set Tactics.general_rewrite_clause gmr
 
-let _ = Hook.set Tactics.subst_one subst_one
+let _ = Hook.set Tactics.subst_one (subst_one false)

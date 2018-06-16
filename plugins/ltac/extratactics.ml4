@@ -48,10 +48,10 @@ let with_delayed_uconstr ist c tac =
 
 let replace_in_clause_maybe_by ist c1 c2 cl tac =
   with_delayed_uconstr ist c1
-  (fun c1 -> replace_in_clause_maybe_by c1 c2 cl (Option.map (Tacinterp.tactic_of_value ist) tac))
+  (fun c1 -> replace_in_clause_maybe_by false c1 c2 cl (Option.map (Tacinterp.tactic_of_value ist) tac))
 
 let replace_term ist dir_opt c cl =
-  with_delayed_uconstr ist c (fun c -> replace_term dir_opt c cl)
+  with_delayed_uconstr ist c (fun c -> replace_term false dir_opt c cl)
 
 TACTIC EXTEND replace
    ["replace" uconstr(c1) "with" constr(c2) clause(cl) by_arg_tac(tac) ]
@@ -152,9 +152,9 @@ let injHyp id =
   injection_main false (fun env sigma -> (sigma, (EConstr.mkVar id, NoBindings)))
 
 TACTIC EXTEND dependent_rewrite
-| [ "dependent" "rewrite" orient(b) constr(c) ] -> [ rewriteInConcl b c ]
+| [ "dependent" "rewrite" orient(b) constr(c) ] -> [ rewriteInConcl false b c ]
 | [ "dependent" "rewrite" orient(b) constr(c) "in" hyp(id) ]
-    -> [ rewriteInHyp b c id ]
+    -> [ rewriteInHyp false b c id ]
 END
 
 (** To be deprecated?, "cutrewrite (t=u) as <-" is equivalent to
@@ -162,9 +162,9 @@ END
     "cutrewrite (t=u) as ->" is equivalent to "enough (t=u) as ->". *)
 
 TACTIC EXTEND cut_rewrite
-| [ "cutrewrite" orient(b) constr(eqn) ] -> [ cutRewriteInConcl b eqn ]
+| [ "cutrewrite" orient(b) constr(eqn) ] -> [ cutRewriteInConcl false b eqn ]
 | [ "cutrewrite" orient(b) constr(eqn) "in" hyp(id) ]
-    -> [ cutRewriteInHyp b eqn id ]
+    -> [ cutRewriteInHyp false b eqn id ]
 END
 
 (**********************************************************************)
@@ -214,18 +214,34 @@ END
 
 TACTIC EXTEND autorewrite
 | [ "autorewrite" "with" ne_preident_list(l) clause(cl) ] ->
-    [ auto_multi_rewrite  l ( cl) ]
+    [ auto_multi_rewrite  false  l ( cl) ]
 | [ "autorewrite" "with" ne_preident_list(l) clause(cl) "using" tactic(t) ] ->
     [
-      auto_multi_rewrite_with (Tacinterp.tactic_of_value ist t) l cl
+      auto_multi_rewrite_with  false  (Tacinterp.tactic_of_value ist t) l cl
     ]
 END
 
 TACTIC EXTEND autorewrite_star
 | [ "autorewrite" "*" "with" ne_preident_list(l) clause(cl) ] ->
-    [ auto_multi_rewrite ~conds:AllMatches l cl ]
+    [ auto_multi_rewrite ~conds:AllMatches false  l cl ]
 | [ "autorewrite" "*" "with" ne_preident_list(l) clause(cl) "using" tactic(t) ] ->
-  [ auto_multi_rewrite_with ~conds:AllMatches (Tacinterp.tactic_of_value ist t) l cl ]
+  [ auto_multi_rewrite_with ~conds:AllMatches false (Tacinterp.tactic_of_value ist t) l cl ]
+END
+
+TACTIC EXTEND fastautorewrite
+| [ "fastautorewrite" "with" ne_preident_list(l) clause(cl) ] ->
+    [ auto_multi_rewrite  true  l ( cl) ]
+| [ "fastautorewrite" "with" ne_preident_list(l) clause(cl) "using" tactic(t) ] ->
+    [
+      auto_multi_rewrite_with true (Tacinterp.tactic_of_value ist t) l cl
+    ]
+END
+
+TACTIC EXTEND fastautorewrite_star
+| [ "fastautorewrite" "*" "with" ne_preident_list(l) clause(cl) ] ->
+    [ auto_multi_rewrite ~conds:AllMatches true l cl ]
+| [ "fastautorewrite" "*" "with" ne_preident_list(l) clause(cl) "using" tactic(t) ] ->
+  [ auto_multi_rewrite_with ~conds:AllMatches true (Tacinterp.tactic_of_value ist t) l cl ]
 END
 
 (**********************************************************************)
@@ -234,7 +250,7 @@ END
 let rewrite_star ist clause orient occs c (tac : Geninterp.Val.t option) =
   let tac' = Option.map (fun t -> Tacinterp.tactic_of_value ist t, FirstSolved) tac in
   with_delayed_uconstr ist c
-    (fun c -> general_rewrite_ebindings_clause clause orient occs ?tac:tac' true true (c,NoBindings) true)
+    (fun c -> general_rewrite_ebindings_clause false clause orient occs ?tac:tac' true true (c,NoBindings) true)
 
 TACTIC EXTEND rewrite_star
 | [ "rewrite" "*" orient(o) uconstr(c) "in" hyp(id) "at" occurrences(occ) by_arg_tac(tac) ] ->
@@ -401,7 +417,7 @@ END
 (* Subst                                                              *)
 
 TACTIC EXTEND subst
-| [ "subst" ne_var_list(l) ] -> [ subst l ]
+| [ "subst" ne_var_list(l) ] -> [ subst false l ]
 | [ "subst" ] -> [ subst_all () ]
 END
 
@@ -692,7 +708,7 @@ let rewrite_except h =
   Proofview.Goal.enter begin fun gl ->
   let hyps = Tacmach.New.pf_ids_of_hyps gl in
   Tacticals.New.tclMAP (fun id -> if Id.equal id h then Proofview.tclUNIT () else 
-      Tacticals.New.tclTRY (Equality.general_rewrite_in true Locus.AllOccurrences true true id (mkVar h) false))
+      Tacticals.New.tclTRY (Equality.general_rewrite_in false true Locus.AllOccurrences true true id (mkVar h) false))
     hyps
   end
 

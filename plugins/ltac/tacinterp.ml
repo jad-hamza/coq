@@ -1797,7 +1797,7 @@ and interp_atomic ist tac : unit Proofview.tactic =
         let cl = interp_clause ist env sigma cl in
         name_atomic ~env
           (TacRewrite (ev,l,cl,Option.map ignore by))
-          (Equality.general_multi_rewrite ev l' cl
+          (Equality.general_multi_rewrite false ev l' cl
              (Option.map (fun by -> Tacticals.New.tclCOMPLETE (interp_tactic ist by),
                Equality.Naive)
                 by))
