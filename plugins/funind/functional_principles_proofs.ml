@@ -405,7 +405,7 @@ let rewrite_until_var arg_num eq_ids : tactic =
 	| [] -> anomaly (Pp.str "Cannot find a way to prove recursive property.");
 	| eq_id::eq_ids ->
 	    tclTHEN
-	      (tclTRY (Proofview.V82.of_tactic (Equality.rewriteRL (mkVar eq_id))))
+              (tclTRY (Proofview.V82.of_tactic (Equality.rewriteRL false (mkVar eq_id))))
 	      (do_rewrite eq_ids)
 	      g
   in
@@ -1063,7 +1063,7 @@ let do_replace (evd:Evd.evar_map ref) params rec_arg_num rev_args_id f fun_num a
 	  let just_introduced = nLastDecls nb_intro_to_do g' in
           let open Context.Named.Declaration in
 	  let just_introduced_id = List.map get_id just_introduced in
-	  tclTHEN (Proofview.V82.of_tactic (Equality.rewriteLR equation_lemma))
+          tclTHEN (Proofview.V82.of_tactic (Equality.rewriteLR false equation_lemma))
 		  (revert just_introduced_id) g'
       )
       g
@@ -1430,7 +1430,7 @@ let backtrack_eqs_until_hrec hrec eqs : tactic =
   fun gls ->
     let eqs = List.map mkVar eqs in
     let rewrite =
-      tclFIRST (List.map (fun x -> Proofview.V82.of_tactic (Equality.rewriteRL x)) eqs )
+      tclFIRST (List.map (fun x -> Proofview.V82.of_tactic (Equality.rewriteRL false x)) eqs )
     in
     let _,hrec_concl  = decompose_prod (project gls) (pf_unsafe_type_of gls (mkVar hrec)) in
     let f_app = Array.last (snd (destApp (project gls) hrec_concl)) in
@@ -1455,7 +1455,7 @@ let rec rewrite_eqs_in_eqs eqs =
 	       (fun id gl ->
 		  observe_tac
 		    (Format.sprintf "rewrite %s in %s " (Id.to_string eq) (Id.to_string id))
-		    (tclTRY (Proofview.V82.of_tactic (Equality.general_rewrite_in true Locus.AllOccurrences
+                    (tclTRY (Proofview.V82.of_tactic (Equality.general_rewrite_in false true Locus.AllOccurrences
 			       true (* dep proofs also: *) true id (mkVar eq) false)))
 		    gl
 	       )
@@ -1662,7 +1662,7 @@ let prove_principle_for_gen
       (* observe_tac "h_fix " *) (Proofview.V82.of_tactic (fix fix_id (List.length args_ids + 1)));
 (*       (fun g -> observe (Printer.pr_goal (sig_it g) ++ fnl() ++ pr_lconstr_env (pf_env g ) (pf_unsafe_type_of g (mkVar fix_id) )); tclIDTAC g); *)
       h_intros (List.rev (acc_rec_arg_id::args_ids));
-      Proofview.V82.of_tactic (Equality.rewriteLR (mkConst eq_ref));
+      Proofview.V82.of_tactic (Equality.rewriteLR false (mkConst eq_ref));
       (* observe_tac "finish" *) (fun gl' ->
 	 let body =
 	   let _,args = destApp (project gl') (pf_concl gl') in

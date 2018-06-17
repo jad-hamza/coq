@@ -896,7 +896,7 @@ let rec make_rewrite_list expr_info max = function
 	    let def_na,_,_ = destProd sigma t in
 	    Nameops.Name.get_id k_na,Nameops.Name.get_id def_na
 	  in
-	  Proofview.V82.of_tactic (general_rewrite_bindings false Locus.AllOccurrences
+          Proofview.V82.of_tactic (general_rewrite_bindings false false Locus.AllOccurrences
 	    true (* dep proofs also: *) true 
 	    (mkVar hp,
              ExplicitBindings[CAst.make @@ (NamedHyp def, expr_info.f_constr);
@@ -923,7 +923,7 @@ let make_rewrite expr_info l hp max =
 	    Nameops.Name.get_id k_na,Nameops.Name.get_id def_na
 	  in
 	 observe_tac (str "general_rewrite_bindings")
-	   (Proofview.V82.of_tactic (general_rewrite_bindings false Locus.AllOccurrences
+           (Proofview.V82.of_tactic (general_rewrite_bindings false false Locus.AllOccurrences
 	    true (* dep proofs also: *) true 
 	    (mkVar hp,
              ExplicitBindings[CAst.make @@ (NamedHyp def, expr_info.f_constr);

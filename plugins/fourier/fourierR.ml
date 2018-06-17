@@ -601,13 +601,13 @@ let rec fourier () =
 				       )))
 		      (Tacticals.New.tclTHEN (apply (if sres then get coq_Rnot_lt_lt
 					       else get coq_Rnot_le_le))
-			    (Tacticals.New.tclTHENS (Equality.replace
+                            (Tacticals.New.tclTHENS (Equality.replace false
 				       (EConstr.of_constr (mkAppL [|cget coq_Rminus;!t2;!t1|]
 					       ))
 				       (EConstr.of_constr tc))
 		 	       [tac2;
                                 (Tacticals.New.tclTHENS
-				  (Equality.replace
+                                  (Equality.replace false
 				    (EConstr.of_constr (mkApp (cget coq_Rinv,
 				      [|cget coq_R1|])))
 				    (get coq_R1))
